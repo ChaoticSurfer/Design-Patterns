@@ -4,7 +4,7 @@ using System.Runtime.Loader;
 Dictionary<string, IPlugin> Plugins = new Dictionary<string, IPlugin>();
 
 
-const string pluginPath = @"C:\Users\Anri_Kezeroti\source\repos\Design-Patterns\Plugin-Architecture\Plugins";
+const string pluginPath = @"C:\Users\ *My_user_name* \source\repos\Design-Patterns\Plugin-Architecture\Plugins";
 
 Console.WriteLine("Start application");
 LoadPlugins();
