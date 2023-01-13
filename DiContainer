@@ -1,0 +1,95 @@
+using System.Reflection;
+using Cache.Console.Exceptions;
+
+namespace DI;
+
+public class DiContainer : IDiContainer
+{
+    private List<ServiceDescriptor> _serviceDescriptors = new();
+    public void Register<TService, TImplementation>() where TImplementation : TService
+    {
+        _serviceDescriptors.Add(new ServiceDescriptor(typeof(TService), typeof(TImplementation)));
+    }
+
+    public void Register<TService, TImplementation>(Func<TService> serviceFactory) where TImplementation : TService
+    {
+        _serviceDescriptors.Add(new ServiceDescriptor(typeof(TService), typeof(TImplementation),
+            () => (object)serviceFactory.Invoke()));
+    }
+
+    public void Register<TService>()
+    {
+        _serviceDescriptors.Add(new ServiceDescriptor(typeof(TService), typeof(TService)));
+    }
+
+    public void Register<TService>(Func<TService> instanceFactory)
+    {
+        _serviceDescriptors.Add(new ServiceDescriptor(typeof(TService), () => (object)instanceFactory.Invoke()));
+    }
+
+    public TService Resolve<TService>()
+    {
+        return resolveType<TService>(typeof(TService));
+    }
+
+    public object Resolve(Type type)
+    {
+        return resolveType<object>(type);
+    }
+
+    private T resolveType<T>(Type type)
+    {
+        var descriptor =
+            _serviceDescriptors.FirstOrDefault(s => s.InterfaceType == type || s.ImplementationType == type);
+        if (descriptor == null) throw new ServiceNotRegisteredException(type.ToString());
+
+        if (descriptor.InstanceFactory != null) // check
+        {
+            return (T)descriptor.InstanceFactory.Invoke();
+        }
+
+        var constructorInfo = descriptor.ImplementationType.GetConstructors().First();
+        var parameterInstances = constructorInfo.GetParameters()
+            .Select(x => x.ParameterType).ToArray();
+
+        var service = Activator.CreateInstance(descriptor.ImplementationType, parameterInstances);
+        if (service == null) throw new ServiceNullException(type.ToString());
+        
+        return (T)service;
+    }
+}
+
+public class ServiceDescriptor
+{
+    public Type InterfaceType { get; }
+    public Type ImplementationType { get; }
+
+    public Func<object> InstanceFactory;
+
+    public ServiceDescriptor(Type interfaceType, Type implementationType)
+    {
+        ValidateImplementationInterface(implementationType);
+
+        ImplementationType = implementationType;
+        InterfaceType = interfaceType;
+    }
+
+    public ServiceDescriptor(Type interfaceType, Func<object> instanceFactory)
+    {
+        InstanceFactory = instanceFactory;
+        InterfaceType = interfaceType;
+    }
+
+    public ServiceDescriptor(Type interfaceType, Type implementationType, Func<object> instanceFactory)
+    {
+        InstanceFactory = instanceFactory;
+        InterfaceType = interfaceType;
+        ImplementationType = implementationType;
+    }
+
+    private void ValidateImplementationInterface(Type implementationType)
+    {
+        if (implementationType.IsAbstract || implementationType.IsInterface)
+            throw new CantInstantiateInterfaceOrAbstractClassException(implementationType.ToString());
+    }
+}
